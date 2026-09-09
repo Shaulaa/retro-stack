@@ -2,14 +2,32 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>RETRO STACK</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="cabinet" id="cabinet">
     <div class="title">RETRO <span>STACK</span></div>
     <div class="stage">
+      <div class="board-wrap" id="board-wrap">
+        <canvas id="board" width="240" height="480"></canvas>
+        <div class="scanlines"></div>
+        <div class="overlay-msg show" id="overlay">
+          <h2 id="overlay-title">RETRO STACK</h2>
+          <p id="overlay-sub">Pilih mode permainan</p>
+          <div class="mode-buttons" id="mode-buttons">
+            <button class="btn" id="mode-marathon">MARATHON</button>
+            <button class="btn" id="mode-sprint">SPRINT 40</button>
+          </div>
+          <div class="result-buttons" id="result-buttons" style="display:none;">
+            <button class="btn" id="restart-btn">MAIN LAGI</button>
+            <button class="btn ghost" id="menu-btn">MENU</button>
+          </div>
+        </div>
+      </div>
+
       <div class="side">
         <div class="panel">
           <h3>HOLD</h3>
@@ -28,23 +46,6 @@
           <h3>SPRINT 40</h3>
           <div class="stat-row"><span>WAKTU</span><b id="sprint-time">00:00.00</b></div>
           <div class="stat-row"><span>TERBAIK</span><b id="sprint-best">-</b></div>
-        </div>
-      </div>
-
-      <div class="board-wrap" id="board-wrap">
-        <canvas id="board" width="240" height="480"></canvas>
-        <div class="scanlines"></div>
-        <div class="overlay-msg show" id="overlay">
-          <h2 id="overlay-title">RETRO STACK</h2>
-          <p id="overlay-sub">Pilih mode permainan</p>
-          <div class="mode-buttons" id="mode-buttons">
-            <button class="btn" id="mode-marathon">MARATHON</button>
-            <button class="btn" id="mode-sprint">SPRINT 40</button>
-          </div>
-          <div class="result-buttons" id="result-buttons" style="display:none;">
-            <button class="btn" id="restart-btn">MAIN LAGI</button>
-            <button class="btn ghost" id="menu-btn">MENU</button>
-          </div>
         </div>
       </div>
 

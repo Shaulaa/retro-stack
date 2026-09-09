@@ -1,4 +1,5 @@
 (function(){
+  const isNarrow = window.matchMedia('(max-width:640px)').matches;
   const COLS=10, ROWS=20, CELL=24;
   const canvas=document.getElementById('board');
   const ctx=canvas.getContext('2d');
@@ -8,6 +9,15 @@
   const hctx=holdCanvas.getContext('2d');
   const cabinet=document.getElementById('cabinet');
   const sprintPanel=document.getElementById('sprint-panel');
+
+  // on small screens, shrink the preview canvases and show fewer upcoming
+  // pieces so the panel row under the board stays compact
+  const NEXT_COUNT = isNarrow ? 2 : 3;
+  const NEXT_SLOT_H = isNarrow ? 50 : 70;
+  if(isNarrow){
+    nextCanvas.width=76; nextCanvas.height=NEXT_COUNT*NEXT_SLOT_H+14;
+    holdCanvas.width=76; holdCanvas.height=54;
+  }
 
   const COLORS={
     I:'#2de2e6', O:'#f9c80e', T:'#ff2e97',
@@ -25,7 +35,7 @@
   const KEYS=Object.keys(SHAPES);
 
   let grid, current, holdPiece, canHold, score, level, lines;
-  let dropInterval, lastTime, gameOver, paused, animId, soundOn=true;
+  let dropInterval, lastTime, gameOver=true, paused=false, animId, soundOn=true;
   let bag=[], queue=[];
   let clearing=null, dropAnim=null, inputLocked=false;
   let mode='marathon';          // 'marathon' | 'sprint'
@@ -33,6 +43,14 @@
   let lastAction=null;          // 'move' | 'rotate' | null  (tracks last input before lock, for T-spin)
   let popups=[];                // floating score/label text
   let sprintStart=0, sprintElapsed=0, sprintRunning=false, pauseStartedAt=0;
+
+  // ---------- lock delay ----------
+  const LOCK_DELAY=500, LOCK_DELAY_MAX_RESETS=15;
+  let lockTimer=null, lockResetCount=0;
+
+  // ---------- DAS (auto-repeat) / soft drop ----------
+  const DAS_DELAY=170, DAS_INTERVAL=50, SOFT_DROP_INTERVAL=50;
+  let dasDir=0, dasDelayTimer=null, dasRepeatTimer=null, softDropTimer=null;
 
   // ---------- persistent storage (falls back to memory if unavailable) ----------
   const memoryStore={};
@@ -53,9 +71,23 @@
   let audioCtx=null;
   function ensureAudio(){
     if(!audioCtx){
-      try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ soundOn=false; }
+      try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ soundOn=false; return; }
+    }
+    if(audioCtx.state==='suspended'){
+      audioCtx.resume().catch(()=>{});
     }
   }
+  // Some browsers keep AudioContext suspended until a real user gesture.
+  // Prime it on the very first tap/click/keypress so later beeps aren't silent.
+  function unlockAudioOnce(){
+    ensureAudio();
+    document.removeEventListener('touchstart',unlockAudioOnce);
+    document.removeEventListener('mousedown',unlockAudioOnce);
+    document.removeEventListener('keydown',unlockAudioOnce);
+  }
+  document.addEventListener('touchstart',unlockAudioOnce,{once:true});
+  document.addEventListener('mousedown',unlockAudioOnce,{once:true});
+  document.addEventListener('keydown',unlockAudioOnce,{once:true});
   function beep(freq,dur,type,vol){
     if(!soundOn) return;
     ensureAudio();
@@ -78,6 +110,7 @@
     hold:()=>beep(260,0.06,'sine',0.04),
     tspin:()=>{ beep(700,0.07,'square',0.05); setTimeout(()=>beep(900,0.09,'square',0.05),60); },
     combo:(n)=>beep(400+n*40,0.06,'square',0.04),
+    levelup:()=>{ beep(600,0.07,'square',0.045); setTimeout(()=>beep(800,0.07,'square',0.045),80); setTimeout(()=>beep(1050,0.12,'square',0.045),160); },
     over:()=>{ beep(200,0.15,'sawtooth',0.05); setTimeout(()=>beep(140,0.3,'sawtooth',0.05),150); },
     finish:()=>{ beep(500,0.1,'square',0.05); setTimeout(()=>beep(700,0.1,'square',0.05),110); setTimeout(()=>beep(1000,0.2,'square',0.05),220); }
   };
@@ -133,7 +166,6 @@
   }
   function checkTSpin(piece){
     if(piece.type!=='T' || lastAction!=='rotate') return false;
-    // pivot is local (1,1) for every T rotation state in this rotate() implementation
     const px=piece.x+1, py=piece.y+1;
     const corners=[[px-1,py-1],[px+1,py-1],[px-1,py+1],[px+1,py+1]];
     let filled=0;
@@ -150,7 +182,6 @@
     for(const y of rows){ grid.splice(y,1); grid.unshift(Array(COLS).fill(null)); }
     const cleared=rows.length;
 
-    // combo
     if(cleared>0) combo++; else combo=-1;
 
     let points=0;
@@ -174,13 +205,17 @@
     score += points;
 
     if(label) addPopup(label, tspin?'#ff2e97':'#f9c80e');
-    else if(cleared>0 && combo<=0) {} // plain clear, no extra label
     if(combo>0) addPopup('COMBO x'+combo, '#2de2e6');
 
     lines+=cleared;
     if(cleared>0){
+      const oldLevel=level;
       level=1+Math.floor(lines/10);
       dropInterval=Math.max(120, 800-(level-1)*70);
+      if(level>oldLevel){
+        addPopup('LEVEL '+level, '#f9c80e');
+        sfx.levelup();
+      }
     }
 
     const highKey=getHigh(mode);
@@ -214,17 +249,21 @@
     current.x=3; current.y=-1;
     canHold=true;
     lastAction=null;
+    cancelLockDelay();
+    lockResetCount=0;
     drawNext();
     if(collides(current.cells,current.x,current.y)) triggerGameOver();
   }
 
   function doHold(){
-    if(gameOver||paused||!canHold||inputLocked) return;
+    if(gameOver||paused||!canHold||inputLocked||!current) return;
     sfx.hold();
     const type=current.type;
     if(holdPiece){
       current=makePiece(holdPiece);
       current.x=3; current.y=-1;
+      cancelLockDelay();
+      lockResetCount=0;
       if(collides(current.cells,current.x,current.y)){ triggerGameOver(); return; }
     } else {
       spawn();
@@ -242,6 +281,7 @@
   }
 
   function lockPiece(){
+    cancelLockDelay();
     const tspin=checkTSpin(current);
     merge(current);
     sfx.lock();
@@ -255,22 +295,48 @@
     }
   }
 
+  function isGrounded(){
+    if(!current) return false;
+    return collides(current.cells,current.x,current.y+1);
+  }
+  function cancelLockDelay(){
+    if(lockTimer){ clearTimeout(lockTimer); lockTimer=null; }
+  }
+  function scheduleLock(){
+    cancelLockDelay();
+    lockTimer=setTimeout(()=>{
+      lockTimer=null;
+      if(gameOver||paused||inputLocked) return;
+      if(isGrounded()){ lockPiece(); draw(); }
+    }, LOCK_DELAY);
+  }
+  function refreshLockDelay(){
+    if(!isGrounded()){ cancelLockDelay(); lockResetCount=0; return; }
+    if(lockResetCount<LOCK_DELAY_MAX_RESETS){
+      lockResetCount++;
+      scheduleLock();
+    } else if(!lockTimer){
+      scheduleLock();
+    }
+  }
+
   function tryMove(dx,dy,silent){
-    if(gameOver||paused||inputLocked) return false;
+    if(gameOver||paused||inputLocked||!current) return false;
     const nx=current.x+dx, ny=current.y+dy;
     if(!collides(current.cells,nx,ny)){
       current.x=nx; current.y=ny;
       if(dx!==0) lastAction='move';
       if(!silent && dx!==0) sfx.move();
+      refreshLockDelay();
       draw();
       return true;
     }
-    if(dy>0){ lockPiece(); draw(); }
+    if(dy>0 && !lockTimer){ scheduleLock(); }
     return false;
   }
 
   function tryRotate(){
-    if(gameOver||paused||inputLocked) return;
+    if(gameOver||paused||inputLocked||!current) return;
     const rotated=rotate(current);
     const kicks=[0,-1,1,-2,2];
     for(const k of kicks){
@@ -279,6 +345,7 @@
         current.x+=k;
         lastAction='rotate';
         sfx.rotate();
+        refreshLockDelay();
         draw();
         return;
       }
@@ -286,13 +353,15 @@
   }
 
   function ghostY(){
+    if(!current) return 0;
     let gy=current.y;
     while(!collides(current.cells,current.x,gy+1)) gy++;
     return gy;
   }
 
   function hardDrop(){
-    if(gameOver||paused||inputLocked) return;
+    if(gameOver||paused||inputLocked||!current) return;
+    cancelLockDelay();
     const target=ghostY();
     if(target===current.y){ lockPiece(); return; }
     const dist=target-current.y;
@@ -307,7 +376,6 @@
 
   function easeOutQuad(t){ return 1-(1-t)*(1-t); }
 
-  // ---------- drawing ----------
   function drawCell(c,x,y,cell,color,alpha){
     c.globalAlpha = alpha!==undefined ? alpha : 1;
     c.fillStyle=color;
@@ -376,10 +444,6 @@
           dropAnim=null;
           inputLocked=false;
           lockPiece();
-          // lockPiece() may have swapped `current` to a brand new piece
-          // (spawn) or started a clear sequence. Either way, the position
-          // and shape captured above are now stale, so redraw fresh next
-          // frame instead of rendering the old data below.
           draw();
           return;
         }
@@ -396,7 +460,6 @@
       }
     }
 
-    // floating popups
     if(popups.length){
       const now=performance.now();
       popups=popups.filter(p=>now-p.startTime<p.duration);
@@ -444,12 +507,12 @@
   function drawNext(){
     nctx.fillStyle='#0d0a16';
     nctx.fillRect(0,0,nextCanvas.width,nextCanvas.height);
-    queue.slice(0,3).forEach((p,i)=>drawMiniPiece(nctx,nextCanvas,p.type,i*70+10));
+    queue.slice(0,NEXT_COUNT).forEach((p,i)=>drawMiniPiece(nctx,nextCanvas,p.type,i*NEXT_SLOT_H+8));
   }
   function drawHold(){
     hctx.fillStyle='#0d0a16';
     hctx.fillRect(0,0,holdCanvas.width,holdCanvas.height);
-    drawMiniPiece(hctx,holdCanvas,holdPiece,15);
+    drawMiniPiece(hctx,holdCanvas,holdPiece,12);
   }
 
   function formatTime(ms){
@@ -467,9 +530,39 @@
     document.getElementById('combo').textContent = combo>0 ? ('x'+combo) : '-';
   }
 
+  function clearDAS(){
+    if(dasDelayTimer){ clearTimeout(dasDelayTimer); dasDelayTimer=null; }
+    if(dasRepeatTimer){ clearInterval(dasRepeatTimer); dasRepeatTimer=null; }
+    dasDir=0;
+  }
+  function startDAS(dir){
+    if(gameOver||paused) return;
+    if(dasDir===dir) return;
+    clearDAS();
+    dasDir=dir;
+    tryMove(dir,0);
+    dasDelayTimer=setTimeout(()=>{
+      dasRepeatTimer=setInterval(()=>tryMove(dir,0), DAS_INTERVAL);
+    }, DAS_DELAY);
+  }
+  function stopSoftDrop(){
+    if(softDropTimer){ clearInterval(softDropTimer); softDropTimer=null; }
+  }
+  function startSoftDrop(){
+    if(gameOver||paused||softDropTimer) return;
+    tryMove(0,1);
+    softDropTimer=setInterval(()=>tryMove(0,1), SOFT_DROP_INTERVAL);
+  }
+  function clearAllInputTimers(){
+    clearDAS();
+    stopSoftDrop();
+    cancelLockDelay();
+  }
+
   function triggerGameOver(){
     gameOver=true;
     sprintRunning=false;
+    clearAllInputTimers();
     const highKey=getHigh(mode);
     if(score>highKey) setHigh(mode,score);
     sfx.over();
@@ -491,6 +584,7 @@
     paused=!paused;
     if(paused){
       pauseStartedAt=performance.now();
+      clearAllInputTimers();
       showResult('JEDA','Tekan lanjut untuk kembali bermain');
       document.getElementById('restart-btn').textContent='LANJUT';
     } else {
@@ -500,6 +594,7 @@
       document.getElementById('overlay').classList.remove('show');
       document.getElementById('restart-btn').textContent='MAIN LAGI';
       lastTime=performance.now();
+      if(current && isGrounded()) scheduleLock();
       animId=requestAnimationFrame(loop);
       draw();
     }
@@ -538,6 +633,8 @@
     clearing=null; dropAnim=null; popups=[];
     lastTime=0;
     bag=[]; queue=[];
+    clearAllInputTimers();
+    lockResetCount=0;
 
     document.getElementById('overlay').classList.remove('show');
     document.getElementById('mode-buttons').style.display='flex';
@@ -563,6 +660,7 @@
 
   function showMenu(){
     gameOver=true; paused=false; sprintRunning=false;
+    clearAllInputTimers();
     cancelAnimationFrame(animId);
     document.getElementById('overlay-title').textContent='RETRO STACK';
     document.getElementById('overlay-sub').textContent='Pilih mode permainan';
@@ -572,17 +670,34 @@
   }
 
   // ---------- input ----------
+  function doHardDrop(){
+    hardDrop();
+    cabinet.classList.add('shake');
+    setTimeout(()=>cabinet.classList.remove('shake'),180);
+  }
+
   document.addEventListener('keydown',(e)=>{
-    if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' ','p','P','c','C','m','M'].includes(e.key)) e.preventDefault();
-    if(e.key==='p'||e.key==='P'){ togglePause(); return; }
-    if(e.key==='m'||e.key==='M'){ soundOn=!soundOn; return; }
+    const key=e.key;
+    if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' ','p','P','c','C','m','M'].includes(key)) e.preventDefault();
+    if(key==='p'||key==='P'){ if(!e.repeat) togglePause(); return; }
+    if(key==='m'||key==='M'){ if(!e.repeat) soundOn=!soundOn; return; }
     if(gameOver||paused) return;
-    if(e.key==='ArrowLeft') tryMove(-1,0);
-    else if(e.key==='ArrowRight') tryMove(1,0);
-    else if(e.key==='ArrowDown') tryMove(0,1);
-    else if(e.key==='ArrowUp') tryRotate();
-    else if(e.key===' '){ hardDrop(); cabinet.classList.add('shake'); setTimeout(()=>cabinet.classList.remove('shake'),180); }
-    else if(e.key==='c'||e.key==='C') doHold();
+    if(e.repeat && ['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' ','c','C'].includes(key)) return;
+    if(key==='ArrowLeft') startDAS(-1);
+    else if(key==='ArrowRight') startDAS(1);
+    else if(key==='ArrowDown') startSoftDrop();
+    else if(key==='ArrowUp') tryRotate();
+    else if(key===' ') doHardDrop();
+    else if(key==='c'||key==='C') doHold();
+  });
+  document.addEventListener('keyup',(e)=>{
+    if(e.key==='ArrowLeft'){ if(dasDir===-1) clearDAS(); }
+    else if(e.key==='ArrowRight'){ if(dasDir===1) clearDAS(); }
+    else if(e.key==='ArrowDown'){ stopSoftDrop(); }
+  });
+  window.addEventListener('blur',()=>{
+    clearAllInputTimers();
+    if(!gameOver && !paused) togglePause();
   });
 
   document.getElementById('mode-marathon').addEventListener('click',()=>beginGame('marathon'));
@@ -593,12 +708,30 @@
   });
   document.getElementById('menu-btn').addEventListener('click', showMenu);
 
-  function bind(id,fn){ document.getElementById(id).addEventListener('click',fn); }
-  bind('t-left',()=>tryMove(-1,0));
-  bind('t-right',()=>tryMove(1,0));
-  bind('t-down',()=>tryMove(0,1));
+  function bind(id,fn){
+    const el=document.getElementById(id);
+    el.addEventListener('click', fn);
+  }
+  // press-and-hold controls (movement/soft-drop): use touch + mouse events
+  // directly rather than Pointer Events, for the widest possible device/
+  // browser support on phones (including older Android WebViews)
+  function bindHold(id,startFn,stopFn){
+    const el=document.getElementById(id);
+    let active=false;
+    const start=(e)=>{ e.preventDefault(); if(active) return; active=true; startFn(); };
+    const stop=(e)=>{ if(!active) return; active=false; stopFn(); };
+    el.addEventListener('touchstart', start, {passive:false});
+    el.addEventListener('touchend', stop);
+    el.addEventListener('touchcancel', stop);
+    el.addEventListener('mousedown', start);
+    el.addEventListener('mouseup', stop);
+    el.addEventListener('mouseleave', stop);
+  }
+  bindHold('t-left', ()=>startDAS(-1), ()=>{ if(dasDir===-1) clearDAS(); });
+  bindHold('t-right', ()=>startDAS(1), ()=>{ if(dasDir===1) clearDAS(); });
+  bindHold('t-down', startSoftDrop, stopSoftDrop);
   bind('t-rotate',()=>tryRotate());
-  bind('t-drop',()=>{ hardDrop(); cabinet.classList.add('shake'); setTimeout(()=>cabinet.classList.remove('shake'),180); });
+  bind('t-drop',doHardDrop);
   bind('t-pause',()=>togglePause());
   bind('t-hold',()=>doHold());
 

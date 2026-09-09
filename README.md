@@ -1,77 +1,36 @@
 # Retro Stack
 
-Retro Stack adalah game puzzle bergaya arcade klasik yang dibuat menggunakan HTML, CSS, dan JavaScript murni. Susun balok yang jatuh, hapus baris sebanyak mungkin, dan raih skor tertinggi dengan tampilan retro neon.
+Game bertumpuk balok bergaya arcade CRT retro. Ditulis pakai HTML/CSS/JS murni (tanpa build tool, tanpa dependency).
 
 ## Fitur
 
-- Mode Marathon untuk bermain selama mungkin
-- Mode Sprint 40 untuk menyelesaikan 40 baris secepat mungkin
-- Sistem skor, level, combo, dan rekor tertinggi
-- Fitur hold untuk menyimpan satu balok
-- Tampilan tiga balok berikutnya
-- Ghost piece untuk membantu memperkirakan posisi jatuh
-- Dukungan T-spin dan Tetris
-- Efek suara yang dapat dinyalakan atau dimatikan
-- Kontrol keyboard dan tombol sentuh untuk perangkat mobile
-- Rekor tersimpan otomatis di browser
-- Tampilan kabinet arcade dengan efek scanline
+- 7-bag randomizer, hold piece, antrean 3 balok berikutnya
+- Lock delay, DAS (auto-repeat gerak), animasi hard-drop yang smooth
+- Deteksi T-spin, combo counter, notifikasi naik level
+- Mode Marathon (endless) & Sprint 40 baris
+- Skor tertinggi tersimpan permanen per mode (localStorage)
+- Efek suara sintesis (tanpa file audio eksternal)
+- Kontrol keyboard + tombol sentuh untuk mobile, layout responsif
 
-## Cara Menjalankan
+## Cara main
 
-1. Clone repository ini
-2. Buka folder project
-3. Buka file `index.html` di browser
-4. Pilih mode Marathon atau Sprint 40
+Cukup buka `index.html` di browser — tidak butuh server atau build step.
 
-Game ini tidak membutuhkan instalasi package atau server khusus. Kamu juga dapat menjalankannya dengan ekstensi Live Server di VS Code.
+## Deploy ke GitHub Pages
 
-## Kontrol Keyboard
+1. Push ketiga file (`index.html`, `style.css`, `game.js`) ke repo GitHub.
+2. Buka **Settings → Pages** di repo tersebut.
+3. Di bagian **Source**, pilih branch `main` (atau branch tempat file ini berada) dan folder `/ (root)`.
+4. Simpan — GitHub akan memberi URL publik (biasanya `https://<username>.github.io/<nama-repo>/`) dalam beberapa menit.
 
-| Tombol | Fungsi |
-| --- | --- |
-| Panah kiri | Menggeser balok ke kiri |
-| Panah kanan | Menggeser balok ke kanan |
-| Panah bawah | Menurunkan balok lebih cepat |
-| Panah atas | Memutar balok |
-| Spasi | Menjatuhkan balok secara instan |
-| C | Menyimpan atau mengambil balok dari hold |
-| P | Menjeda atau melanjutkan permainan |
-| M | Menyalakan atau mematikan suara |
+## Kontrol
 
-## Kontrol Mobile
-
-Pada layar kecil, tombol kontrol akan muncul di bawah papan permainan. Tombol tersebut menyediakan fungsi hold, geser, putar, turun, jatuh instan, dan jeda.
-
-## Mode Permainan
-
-### Marathon
-
-Bermain tanpa batas baris. Kecepatan balok akan meningkat setiap kali jumlah baris yang dihapus bertambah sepuluh.
-
-### Sprint 40
-
-Selesaikan 40 baris secepat mungkin. Waktu terbaik akan disimpan di browser dan dapat digunakan untuk mengejar rekor baru.
-
-## Struktur Project
-
-| File | Keterangan |
-| --- | --- |
-| `index.html` | Struktur halaman dan elemen antarmuka game |
-| `style.css` | Tampilan visual, layout, dan responsivitas |
-| `game.js` | Logika permainan, kontrol, skor, animasi, dan suara |
-
-## Teknologi
-
-- HTML5 Canvas
-- CSS3
-- JavaScript
-- Web Audio API
-- Local Storage
-
-## Catatan
-
-Rekor tersimpan menggunakan penyimpanan lokal browser. Data tersebut hanya tersedia pada browser dan perangkat yang sama.
-
-## Lisensi
-
-Project ini dibuat untuk tujuan pembelajaran dan eksperimen web game.
+| Aksi | Keyboard | Sentuh |
+|---|---|---|
+| Geser kiri/kanan | ← → | ◀ ▶ |
+| Turun cepat | ↓ | ▼ |
+| Putar | ↑ | ⟳ |
+| Jatuh instan | Spasi | JATUH |
+| Tahan balok | C | HOLD |
+| Jeda | P | JEDA |
+| Suara on/off | M | — |
