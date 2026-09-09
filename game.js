@@ -19,6 +19,34 @@
     holdCanvas.width=76; holdCanvas.height=54;
   }
 
+  // Compute the board's on-screen size in plain pixels via JS rather than
+  // relying on newer CSS units (dvh, aspect-ratio) some mobile browsers
+  // don't support — this guarantees a correctly sized, tappable layout
+  // everywhere instead of silently collapsing to 0 on unsupported browsers.
+  function layoutMobile(){
+    if(window.innerWidth>640) return;
+    try{
+      const boardWrap=document.getElementById('board-wrap');
+      const controlsEl=document.querySelector('.touch-controls');
+      const titleEl=document.querySelector('.title');
+      const sides=document.querySelectorAll('.side');
+      const controlsH = controlsEl ? controlsEl.offsetHeight : 130;
+      const titleH = titleEl ? titleEl.offsetHeight : 28;
+      let sidesH=0;
+      sides.forEach(s=>{ sidesH+=s.offsetHeight; });
+      const reserve = controlsH+titleH+sidesH+50; // padding/gaps allowance
+      let boardH = window.innerHeight - reserve;
+      boardH = Math.max(200, Math.min(boardH, 440));
+      let boardW = boardH/2;
+      const maxW = window.innerWidth-24;
+      if(boardW>maxW){ boardW=maxW; boardH=boardW*2; }
+      boardWrap.style.width=boardW+'px';
+      boardWrap.style.height=boardH+'px';
+    }catch(e){ /* CSS fallback values still apply if this fails */ }
+  }
+  window.addEventListener('resize',layoutMobile);
+  window.addEventListener('orientationchange',()=>setTimeout(layoutMobile,200));
+
   const COLORS={
     I:'#2de2e6', O:'#f9c80e', T:'#ff2e97',
     S:'#3ef2a4', Z:'#ff4d5e', J:'#4d79ff', L:'#ff8c42'
@@ -740,4 +768,5 @@
   score=0; level=1; lines=0;
   ctx.fillStyle='#070510';
   ctx.fillRect(0,0,canvas.width,canvas.height);
+  layoutMobile();
 })();
