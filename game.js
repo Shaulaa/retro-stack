@@ -13,10 +13,11 @@
   // on small screens, shrink the preview canvases and show fewer upcoming
   // pieces so the panel row under the board stays compact
   const NEXT_COUNT = isNarrow ? 2 : 3;
-  const NEXT_SLOT_H = isNarrow ? 50 : 70;
+  const NEXT_SLOT_H = isNarrow ? 38 : 70;
+  const MINI_CELL = isNarrow ? 14 : 18;
   if(isNarrow){
-    nextCanvas.width=76; nextCanvas.height=NEXT_COUNT*NEXT_SLOT_H+14;
-    holdCanvas.width=76; holdCanvas.height=54;
+    nextCanvas.width=62; nextCanvas.height=NEXT_COUNT*NEXT_SLOT_H+10;
+    holdCanvas.width=62; holdCanvas.height=40;
   }
 
   // Compute the board's on-screen size in plain pixels via JS rather than
@@ -34,9 +35,9 @@
       const titleH = titleEl ? titleEl.offsetHeight : 28;
       let sidesH=0;
       sides.forEach(s=>{ sidesH+=s.offsetHeight; });
-      const reserve = controlsH+titleH+sidesH+30; // padding/gaps allowance
+      const reserve = controlsH+titleH+sidesH+22; // padding/gaps allowance
       let boardH = window.innerHeight - reserve;
-      boardH = Math.max(220, Math.min(boardH, 560));
+      boardH = Math.max(220, Math.min(boardH, 620));
       let boardW = boardH/2;
       const maxW = window.innerWidth-24;
       if(boardW>maxW){ boardW=maxW; boardH=boardW*2; }
@@ -519,7 +520,7 @@
 
   function drawMiniPiece(c,cvs,type,offsetY){
     if(!type) return;
-    const cell=18;
+    const cell=MINI_CELL;
     const shape=SHAPES[type];
     const xs=shape.map(p=>p[0]), ys=shape.map(p=>p[1]);
     const minX=Math.min(...xs), minY=Math.min(...ys), maxX=Math.max(...xs);
