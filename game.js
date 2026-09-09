@@ -34,9 +34,9 @@
       const titleH = titleEl ? titleEl.offsetHeight : 28;
       let sidesH=0;
       sides.forEach(s=>{ sidesH+=s.offsetHeight; });
-      const reserve = controlsH+titleH+sidesH+50; // padding/gaps allowance
+      const reserve = controlsH+titleH+sidesH+30; // padding/gaps allowance
       let boardH = window.innerHeight - reserve;
-      boardH = Math.max(200, Math.min(boardH, 440));
+      boardH = Math.max(220, Math.min(boardH, 560));
       let boardW = boardH/2;
       const maxW = window.innerWidth-24;
       if(boardW>maxW){ boardW=maxW; boardH=boardW*2; }

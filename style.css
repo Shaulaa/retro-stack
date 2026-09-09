@@ -73,9 +73,9 @@
     box-shadow:inset 0 0 24px rgba(0,0,0,0.9), 0 0 20px rgba(45,226,230,0.08);
     width:220px;
     height:440px;
-    max-width:72vw;
-    max-height:50vh;
-    max-height:50dvh;
+    max-width:78vw;
+    max-height:58vh;
+    max-height:58dvh;
     order:-1;
     flex-shrink:0;
   }
@@ -166,26 +166,37 @@
   #next-canvas, #hold-canvas{ display:block; margin:0 auto; image-rendering:pixelated; }
   .hint{ display:none; }
 
-  /* touch controls docked to the bottom of the screen, always reachable */
+  /* touch controls docked to the bottom of the screen, always reachable.
+     Movement (left/down/right) is grouped on the left for the left thumb;
+     actions (hold/rotate/pause/drop) are grouped on the right for the
+     right thumb — mirrors the layout most mobile games use. */
   .touch-controls{
     position:fixed;
     left:0; right:0; bottom:0;
     display:flex;
-    justify-content:center;
-    align-items:center;
-    gap:6px;
-    flex-wrap:wrap;
-    padding:8px 10px calc(10px + env(safe-area-inset-bottom,0px));
-    background:linear-gradient(180deg, rgba(10,7,18,0) 0%, #0a0712 40%);
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:10px;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));
+    background:linear-gradient(180deg, rgba(10,7,18,0) 0%, #0a0712 45%);
     z-index:20;
   }
+  .tc-group{ display:grid; gap:7px; }
+  .tc-move{
+    grid-template-columns:repeat(3, 1fr);
+    align-items:end;
+  }
+  .tc-action{
+    grid-template-columns:repeat(2, 1fr);
+    justify-items:end;
+  }
   .tbtn{
-    width:50px;height:50px;
-    border-radius:10px;
+    width:54px;height:54px;
+    border-radius:12px;
     border:2px solid var(--panel-edge);
     background:#221a3d;
     color:var(--cyan);
-    font-size:19px;
+    font-size:20px;
     display:flex;align-items:center;justify-content:center;
     box-shadow:0 0 8px rgba(45,226,230,0.15);
     user-select:none;
@@ -193,7 +204,8 @@
     -webkit-touch-callout:none;
   }
   .tbtn:active{background:#33285c;}
-  .tbtn.wide{width:96px; font-size:11.5px; letter-spacing:1px;}
+  .tbtn.wide{width:66px; font-size:10px; letter-spacing:0.5px; text-align:center;}
+  .tc-move #t-down{ font-size:22px; }
 
   /* ---------- desktop enhancement ---------- */
   @media (min-width:641px){
