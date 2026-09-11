@@ -33,14 +33,19 @@
       const sides=document.querySelectorAll('.side');
       const controlsH = controlsEl ? controlsEl.offsetHeight : 130;
       const titleH = titleEl ? titleEl.offsetHeight : 28;
-      let sidesH=0;
-      sides.forEach(s=>{ sidesH+=s.offsetHeight; });
-      const reserve = controlsH+titleH+sidesH+22; // padding/gaps allowance
-      let boardH = window.innerHeight - reserve;
-      boardH = Math.max(220, Math.min(boardH, 620));
+      let sidesW=0;
+      sides.forEach(s=>{ sidesW+=s.offsetWidth; });
+
+      const vReserve = controlsH+titleH+30; // vertical padding/gap allowance
+      const availH = window.innerHeight - vReserve;
+
+      const hReserve = sidesW+40; // horizontal gaps/padding allowance
+      const availW = window.innerWidth - hReserve;
+
+      let boardH = Math.min(availH, availW*2, 640);
+      boardH = Math.max(220, boardH);
       let boardW = boardH/2;
-      const maxW = window.innerWidth-24;
-      if(boardW>maxW){ boardW=maxW; boardH=boardW*2; }
+
       boardWrap.style.width=boardW+'px';
       boardWrap.style.height=boardH+'px';
     }catch(e){ /* CSS fallback values still apply if this fails */ }
